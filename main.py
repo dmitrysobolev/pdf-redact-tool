@@ -7,7 +7,7 @@ import sys
 # Check if filename and text were provided
 if len(sys.argv) != 3:
     print("Usage: python main.py <pdf_filename> <text_to_redact>")
-    print('Example: python main.py document.pdf "Licensed to Dmitrii Sobolev <dmitrysobolev@gmail.com>"')
+    print('Example: python main.py document.pdf "Licensed to John Doe <john.doe@example.com>"')
     sys.exit(1)
 
 input_file = sys.argv[1]
