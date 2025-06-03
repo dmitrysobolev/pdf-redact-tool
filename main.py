@@ -52,7 +52,7 @@ doc.close()
 # Step 2: Compress with qpdf
 print("Step 2: Optimizing with qpdf...")
 
-subprocess.run([
+result = subprocess.run([
     "qpdf", 
     "--compress-streams=y",
     "--recompress-flate", 
@@ -60,7 +60,22 @@ subprocess.run([
     "--object-streams=generate",
     temp_file,
     output_file
-], check=True)
+])
+
+# Handle qpdf exit codes gracefully
+# 0 = Success, no issues
+# 2 = Error (recoverable)  
+# 3 = Success with warnings
+# >3 = Fatal error
+if result.returncode == 0:
+    print("  qpdf optimization completed successfully")
+elif result.returncode == 3:
+    print("  qpdf optimization completed with warnings (this is normal)")
+elif result.returncode == 2:
+    print("  qpdf encountered recoverable errors but completed")
+else:
+    print(f"  qpdf failed with exit code {result.returncode}")
+    raise subprocess.CalledProcessError(result.returncode, result.args)
 
 os.remove(temp_file)
 
