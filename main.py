@@ -46,45 +46,44 @@ for page_num in range(len(doc)):
 
 print(f"Total instances found and redacted: {total_found}")
 
-# Use context manager for temporary file to ensure cleanup
-with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
+# Step 2: Compress with qpdf
+print("Step 2: Optimizing with qpdf...")
+try:
+    temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
     temp_filename = temp_file.name
+    temp_file.close()
     doc.save(temp_filename, garbage=4, deflate=True, clean=True)
     doc.close()
 
-    # Step 2: Compress with qpdf
-    print("Step 2: Optimizing with qpdf...")
-    
-    try:
-        result = subprocess.run([
-            "qpdf", 
-            "--compress-streams=y",
-            "--recompress-flate", 
-            "--optimize-images",
-            "--object-streams=generate",
-            temp_filename,
-            output_file
-        ])
+    result = subprocess.run([
+        "qpdf", 
+        "--compress-streams=y",
+        "--recompress-flate", 
+        "--optimize-images",
+        "--object-streams=generate",
+        temp_filename,
+        output_file
+    ])
 
-        # Handle qpdf exit codes gracefully
-        # 0 = Success, no issues
-        # 2 = Error (recoverable)  
-        # 3 = Success with warnings
-        # >3 = Fatal error
-        if result.returncode == 0:
-            print("  qpdf optimization completed successfully")
-        elif result.returncode == 3:
-            print("  qpdf optimization completed with warnings (this is normal)")
-        elif result.returncode == 2:
-            print("  qpdf encountered recoverable errors but completed")
-        else:
-            print(f"  qpdf failed with exit code {result.returncode}")
-            raise subprocess.CalledProcessError(result.returncode, result.args)
+    # Handle qpdf exit codes gracefully
+    # 0 = Success, no issues
+    # 2 = Error (recoverable)  
+    # 3 = Success with warnings
+    # >3 = Fatal error
+    if result.returncode == 0:
+        print("  qpdf optimization completed successfully")
+    elif result.returncode == 3:
+        print("  qpdf optimization completed with warnings (this is normal)")
+    elif result.returncode == 2:
+        print("  qpdf encountered recoverable errors but completed")
+    else:
+        print(f"  qpdf failed with exit code {result.returncode}")
+        raise subprocess.CalledProcessError(result.returncode, result.args)
 
-    finally:
-        # Ensure temp file is always cleaned up, even if qpdf fails
-        if os.path.exists(temp_filename):
-            os.remove(temp_filename)
+finally:
+    # Ensure temp file is always cleaned up, even if doc.save() or qpdf fails
+    if os.path.exists(temp_filename):
+        os.remove(temp_filename)
 
 print(f"Redaction completed: {output_file}")
 
