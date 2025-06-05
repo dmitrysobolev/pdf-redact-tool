@@ -31,7 +31,6 @@ pdf-redact-tool/
 ├── config.py                 # Configuration management
 ├── test_redactor.py          # Unit tests
 ├── example_config.json       # Configuration example
-├── IMPROVEMENTS.md           # Detailed improvement documentation
 ├── README.md                 # This file
 └── pyproject.toml           # Project configuration
 ```
@@ -230,7 +229,6 @@ Successfully tested on a 238-page PDF:
 - **`config.py`**: Configuration management with `RedactionConfig` class
 - **`test_redactor.py`**: Comprehensive unit test suite
 - **`example_config.json`**: Sample configuration file
-- **`IMPROVEMENTS.md`**: Detailed documentation of all improvements
 
 ## 🚨 Error Handling
 
@@ -266,6 +264,5 @@ This project is open source. Use responsibly and ensure you have rights to modif
 
 ## 📚 Additional Resources
 
-- **[IMPROVEMENTS.md](IMPROVEMENTS.md)**: Comprehensive documentation of all improvements
 - **[Configuration Guide](example_config.json)**: Example configuration file
 - **[API Documentation](pdf_redactor.py)**: Core class documentation with type hints
