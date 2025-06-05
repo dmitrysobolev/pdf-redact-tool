@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple, Iterator
 
 import pymupdf
+from tqdm import tqdm
 
 # Constants
 DEFAULT_OUTPUT_SUFFIX = "_redacted"
@@ -29,9 +30,10 @@ class RedactionError(Exception):
 class PDFRedactor:
     """Handles PDF redaction operations with PyMuPDF and qpdf optimization."""
     
-    def __init__(self, input_file: Path, output_file: Optional[Path] = None):
+    def __init__(self, input_file: Path, output_file: Optional[Path] = None, show_progress: bool = True):
         self.input_file = Path(input_file)
         self.output_file = output_file or self._generate_output_filename()
+        self.show_progress = show_progress
         self.logger = logging.getLogger(__name__)
         
         if not self.input_file.exists():
@@ -85,14 +87,35 @@ class PDFRedactor:
         total_redacted = 0
         
         try:
-            for pattern in text_patterns:
+            # Create overall progress bar for patterns
+            pattern_pbar = tqdm(
+                text_patterns, 
+                desc="Processing patterns", 
+                disable=not self.show_progress,
+                unit="pattern"
+            )
+            
+            for pattern in pattern_pbar:
+                pattern_pbar.set_description(f"Processing pattern: '{pattern}'")
                 self.logger.info(f"Searching for pattern: '{pattern}'")
+                
                 pattern_redacted = self._redact_pattern(
                     doc, pattern, case_sensitive, use_regex, whole_words_only
                 )
                 total_redacted += pattern_redacted
                 self.logger.info(f"Redacted {pattern_redacted} instances of '{pattern}'")
+                
+                # Update pattern progress bar with current stats
+                pattern_pbar.set_postfix({
+                    'found': pattern_redacted,
+                    'total': total_redacted
+                })
             
+            pattern_pbar.close()
+            
+            # Show optimization progress
+            if self.show_progress:
+                print("Applying redactions and optimizing...")
             self.logger.info("Applying redactions and optimizing...")
             self._save_and_optimize(doc)
             
@@ -113,7 +136,16 @@ class PDFRedactor:
         pattern_count = 0
         search_flags = pymupdf.TEXT_DEHYPHENATE
         
-        for page_num in range(len(doc)):
+        # Create progress bar for pages
+        page_pbar = tqdm(
+            range(len(doc)), 
+            desc=f"Scanning pages for '{pattern[:20]}{'...' if len(pattern) > 20 else ''}'",
+            disable=not self.show_progress,
+            unit="page",
+            leave=False
+        )
+        
+        for page_num in page_pbar:
             page = doc[page_num]
             
             if use_regex:
@@ -133,7 +165,14 @@ class PDFRedactor:
                     page.add_redact_annot(instance)
                 
                 page.apply_redactions()
+                
+                # Update progress bar with current findings
+                page_pbar.set_postfix({
+                    'page': f"{page_num + 1}/{len(doc)}",
+                    'found': pattern_count
+                })
         
+        page_pbar.close()
         return pattern_count
     
     def _find_text_instances(
@@ -333,11 +372,30 @@ class PDFRedactor:
         }
         
         try:
-            for pattern in text_patterns:
+            # Create overall progress bar for patterns
+            pattern_pbar = tqdm(
+                text_patterns, 
+                desc="Previewing patterns", 
+                disable=not self.show_progress,
+                unit="pattern"
+            )
+            
+            for pattern in pattern_pbar:
                 pattern_count = 0
                 pattern_pages = set()
                 
-                for page_num in range(len(doc)):
+                pattern_pbar.set_description(f"Previewing: '{pattern[:20]}{'...' if len(pattern) > 20 else ''}'")
+                
+                # Create progress bar for pages
+                page_pbar = tqdm(
+                    range(len(doc)), 
+                    desc=f"Scanning pages",
+                    disable=not self.show_progress,
+                    unit="page",
+                    leave=False
+                )
+                
+                for page_num in page_pbar:
                     page = doc[page_num]
                     
                     if use_regex:
@@ -355,12 +413,27 @@ class PDFRedactor:
                         pattern_count += page_count
                         pattern_pages.add(page_num + 1)
                         preview_results["pages_affected"].add(page_num + 1)
+                        
+                        # Update page progress bar
+                        page_pbar.set_postfix({
+                            'found': pattern_count
+                        })
+                
+                page_pbar.close()
                 
                 preview_results["patterns"][pattern] = {
                     "count": pattern_count,
                     "pages": sorted(pattern_pages)
                 }
                 preview_results["total_instances"] += pattern_count
+                
+                # Update pattern progress bar
+                pattern_pbar.set_postfix({
+                    'found': pattern_count,
+                    'total': preview_results["total_instances"]
+                })
+            
+            pattern_pbar.close()
         
         finally:
             doc.close()

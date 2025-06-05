@@ -14,6 +14,7 @@ A **professional-grade** Python tool that securely redacts text from PDF files w
 
 ### Advanced Features
 ✅ **Dry-Run Mode**: Preview changes before applying them  
+✅ **Interactive Progress Bars**: Real-time progress tracking with detailed statistics  
 ✅ **Configuration Management**: JSON-based configuration with predefined pattern sets  
 ✅ **Professional Logging**: Configurable logging levels with detailed progress reporting  
 ✅ **Modular Architecture**: Clean, maintainable, and extensible codebase  
@@ -89,13 +90,16 @@ uv run python main.py -v -o sanitized.pdf document.pdf "sensitive.*"
 
 # Whole word matching only
 uv run python main.py --whole-words document.pdf "John"
+
+# Disable progress bars for scripting
+uv run python main.py --no-progress document.pdf "confidential"
 ```
 
 ### Command Line Options
 
 ```bash
 usage: main.py [-h] [-o OUTPUT] [--regex] [--case-insensitive] [--whole-words] 
-               [--dry-run] [-v] input_file patterns [patterns ...]
+               [--dry-run] [-v] [--no-progress] input_file patterns [patterns ...]
 
 options:
   -h, --help           Show help message
@@ -105,7 +109,29 @@ options:
   --whole-words        Match whole words only
   --dry-run            Preview changes without applying them
   -v, --verbose        Enable verbose output with detailed logging
+  --no-progress        Disable progress bars
 ```
+
+## 📊 Progress Tracking
+
+The tool provides comprehensive progress tracking with interactive progress bars:
+
+### Features
+- **Pattern Processing**: Shows progress through multiple patterns with current statistics
+- **Page Scanning**: Real-time page-by-page progress for each pattern  
+- **Performance Metrics**: Processing speed, estimated time remaining, and match counts
+- **Customizable**: Can be disabled with `--no-progress` for scripting environments
+
+### Progress Bar Components
+- **Pattern Progress**: Overall progress through all patterns
+- **Page Progress**: Current page being processed within each pattern  
+- **Statistics**: Number of matches found and processing speed
+- **Time Estimates**: Completion time estimates for long operations
+
+### Integration
+- **CLI Mode**: Automatic progress bars for interactive use
+- **Scripting Mode**: Use `--no-progress` to disable for clean output  
+- **Programmatic**: Control via `show_progress` parameter in `PDFRedactor`
 
 ## 📊 Sample Output
 
@@ -114,6 +140,8 @@ options:
 INFO: Processing: document.pdf
 INFO: Patterns to redact: ['www.example.com']
 INFO: DRY RUN MODE - No changes will be made
+INFO: Previewing redactions for: document.pdf
+Previewing: 'www.example.com': 100%|██████████| 1/1 [00:01<00:00,  1.2pattern/s, found=15, total=15]
 INFO: Preview Results:
 INFO:   Pattern 'www.example.com': 15 instances on pages [1, 3, 5, 8, 12]
 INFO: Total instances that would be redacted: 15
@@ -126,10 +154,13 @@ INFO: Processing: document.pdf
 INFO: Patterns to redact: ['confidential', 'internal use only']
 INFO: Output will be: document_redacted.pdf
 INFO: Opening PDF: document.pdf
+Processing pattern: 'confidential': 50%|██████     | 1/2 [00:02<00:02, 2.1s/pattern, found=8, total=8]
 INFO: Searching for pattern: 'confidential'
 INFO: Redacted 8 instances of 'confidential'
+Processing pattern: 'internal use only': 100%|██████████| 2/2 [00:04<00:00, 2.0s/pattern, found=3, total=11]
 INFO: Searching for pattern: 'internal use only'
 INFO: Redacted 3 instances of 'internal use only'
+Applying redactions and optimizing...
 INFO: Applying redactions and optimizing...
 INFO: qpdf optimization completed successfully
 INFO: Total instances redacted: 11
@@ -164,8 +195,8 @@ Use the tool programmatically in your Python code:
 ```python
 from pdf_redactor import PDFRedactor
 
-# Create redactor instance
-redactor = PDFRedactor("input.pdf", "output.pdf")
+# Create redactor instance with progress bars
+redactor = PDFRedactor("input.pdf", "output.pdf", show_progress=True)
 
 # Redact multiple patterns
 patterns = ["confidential", "internal.*only"]

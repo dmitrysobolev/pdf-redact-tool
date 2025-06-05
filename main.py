@@ -77,6 +77,12 @@ Examples:
         help="Enable verbose output"
     )
     
+    parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress bars"
+    )
+    
     return parser.parse_args()
 
 
@@ -87,7 +93,7 @@ def main() -> int:
     logger = logging.getLogger(__name__)
     
     try:
-        redactor = PDFRedactor(args.input_file, args.output)
+        redactor = PDFRedactor(args.input_file, args.output, show_progress=not args.no_progress)
         
         logger.info(f"Processing: {args.input_file}")
         logger.info(f"Patterns to redact: {args.patterns}")
