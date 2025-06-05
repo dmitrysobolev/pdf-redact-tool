@@ -1,95 +1,148 @@
-import pymupdf
-import re
-import subprocess
-import os
+#!/usr/bin/env python3
+"""
+PDF Redaction Tool - Command Line Interface
+
+A comprehensive tool for redacting text from PDF files with optimization.
+Supports regex patterns, case-insensitive matching, and configurable options.
+"""
+
+import argparse
+import logging
 import sys
-import tempfile
+from pathlib import Path
 
-if len(sys.argv) != 3:
-    print("Usage: python main.py <pdf_filename> <text_to_redact>")
-    print('Example: python main.py document.pdf "Licensed to John Doe <john.doe@example.com>"')
-    sys.exit(1)
+from pdf_redactor import PDFRedactor, RedactionError
 
-input_file = sys.argv[1]
-text_to_redact = sys.argv[2]
 
-if not os.path.exists(input_file):
-    print(f"Error: File '{input_file}' not found!")
-    sys.exit(1)
+def setup_logging(verbose: bool = False) -> None:
+    """Configure logging."""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(levelname)s: %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
 
-base_name = os.path.splitext(input_file)[0]
-output_file = f"{base_name}_redacted.pdf"
 
-print(f"Processing: {input_file}")
-print(f"Text to redact: '{text_to_redact}'")
-print(f"Output will be: {output_file}")
-
-# Step 1: Redact with PyMuPDF
-print("Step 1: Performing redaction...")
-doc = pymupdf.open(input_file)
-
-total_found = 0
-
-for page_num in range(len(doc)):
-    page = doc[page_num]
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Redact text from PDF files with optimization",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s document.pdf "John Doe"
+  %(prog)s -o output.pdf document.pdf "Licensed to.*"
+  %(prog)s --regex --case-insensitive document.pdf "confidential"
+  %(prog)s --multiple-patterns document.pdf "pattern1" "pattern2"
+        """
+    )
     
-    text_instances = page.search_for(text_to_redact, flags=pymupdf.TEXT_DEHYPHENATE)
+    parser.add_argument("input_file", type=Path, help="Input PDF file")
+    parser.add_argument("patterns", nargs="+", help="Text patterns to redact")
     
-    if text_instances:
-        print(f"  Found on page {page_num + 1}: {len(text_instances)} instance(s)")
-        total_found += len(text_instances)
+    parser.add_argument(
+        "-o", "--output",
+        type=Path,
+        help="Output file (default: input_file_redacted.pdf)"
+    )
     
-    for inst in text_instances:
-        page.add_redact_annot(inst)
+    parser.add_argument(
+        "--regex",
+        action="store_true",
+        help="Treat patterns as regular expressions"
+    )
     
-    page.apply_redactions()
+    parser.add_argument(
+        "--case-insensitive",
+        action="store_true",
+        help="Perform case-insensitive matching"
+    )
+    
+    parser.add_argument(
+        "--whole-words",
+        action="store_true",
+        help="Match whole words only"
+    )
+    
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be redacted without making changes"
+    )
+    
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable verbose output"
+    )
+    
+    return parser.parse_args()
 
-print(f"Total instances found and redacted: {total_found}")
 
-# Step 2: Compress with qpdf
-print("Step 2: Optimizing with qpdf...")
-try:
-    temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-    temp_filename = temp_file.name
-    temp_file.close()
-    doc.save(temp_filename, garbage=4, deflate=True, clean=True)
-    doc.close()
+def main() -> int:
+    """Main entry point."""
+    args = parse_arguments()
+    setup_logging(args.verbose)
+    logger = logging.getLogger(__name__)
+    
+    try:
+        redactor = PDFRedactor(args.input_file, args.output)
+        
+        logger.info(f"Processing: {args.input_file}")
+        logger.info(f"Patterns to redact: {args.patterns}")
+        logger.info(f"Output will be: {redactor.output_file}")
+        
+        if args.dry_run:
+            logger.info("DRY RUN MODE - No changes will be made")
+            preview = redactor.preview_redactions(
+                args.patterns,
+                case_sensitive=not args.case_insensitive,
+                use_regex=args.regex,
+                whole_words_only=args.whole_words
+            )
+            
+            logger.info("Preview Results:")
+            for pattern, info in preview["patterns"].items():
+                logger.info(f"  Pattern '{pattern}': {info['count']} instances on pages {info['pages']}")
+            
+            logger.info(f"Total instances that would be redacted: {preview['total_instances']}")
+            logger.info(f"Pages that would be affected: {preview['pages_affected']}")
+            return 0
+        
+        total_redacted = redactor.find_and_redact_text(
+            args.patterns,
+            case_sensitive=not args.case_insensitive,
+            use_regex=args.regex,
+            whole_words_only=args.whole_words
+        )
+        
+        logger.info(f"Total instances redacted: {total_redacted}")
+        
+        if total_redacted == 0:
+            logger.warning("No instances found to redact")
+        
+        original_mb, final_mb, size_change = redactor.get_size_info()
+        logger.info(f"Original size: {original_mb:.1f} MB")
+        logger.info(f"Final size: {final_mb:.1f} MB")
+        logger.info(f"Size change: {size_change:+.1f}%")
+        
+        logger.info(f"Redaction completed: {redactor.output_file}")
+        return 0
+        
+    except (FileNotFoundError, RedactionError) as e:
+        logger.error(str(e))
+        return 1
+    except KeyboardInterrupt:
+        logger.info("Operation cancelled by user")
+        return 1
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
 
-    result = subprocess.run([
-        "qpdf", 
-        "--compress-streams=y",
-        "--recompress-flate", 
-        "--optimize-images",
-        "--object-streams=generate",
-        temp_filename,
-        output_file
-    ])
 
-    # Handle qpdf exit codes gracefully
-    # 0 = Success, no issues
-    # 2 = Error (recoverable)  
-    # 3 = Success with warnings
-    # >3 = Fatal error
-    if result.returncode == 0:
-        print("  qpdf optimization completed successfully")
-    elif result.returncode == 3:
-        print("  qpdf optimization completed with warnings (this is normal)")
-    elif result.returncode == 2:
-        print("  qpdf encountered recoverable errors but completed")
-    else:
-        print(f"  qpdf failed with exit code {result.returncode}")
-        raise subprocess.CalledProcessError(result.returncode, result.args)
-
-finally:
-    # Ensure temp file is always cleaned up, even if doc.save() or qpdf fails
-    if os.path.exists(temp_filename):
-        os.remove(temp_filename)
-
-print(f"Redaction completed: {output_file}")
-
-original_size = os.path.getsize(input_file)
-final_size = os.path.getsize(output_file)
-
-print(f"Original size: {original_size / (1024*1024):.1f} MB")
-print(f"Final size: {final_size / (1024*1024):.1f} MB")
-print(f"Size change: {((final_size - original_size) / original_size * 100):+.1f}%") 
+if __name__ == "__main__":
+    sys.exit(main()) 

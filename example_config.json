@@ -1,0 +1,45 @@
+{
+  "case_sensitive": false,
+  "use_regex": true,
+  "whole_words_only": false,
+  "output_suffix": "_redacted",
+  "create_backup": true,
+  "backup_suffix": ".backup",
+  "compress_streams": true,
+  "recompress_flate": true,
+  "optimize_images": true,
+  "object_streams": true,
+  "log_level": "INFO",
+  "log_file": null,
+  "max_file_size_mb": 100,
+  "temp_dir": null,
+  "pattern_sets": {
+    "email": [
+      "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
+    ],
+    "phone": [
+      "\\b\\d{3}[-.]?\\d{3}[-.]?\\d{4}\\b",
+      "\\(\\d{3}\\)[-\\s]?\\d{3}[-.]?\\d{4}"
+    ],
+    "ssn": [
+      "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    ],
+    "credit_card": [
+      "\\b\\d{4}[-\\s]?\\d{4}[-\\s]?\\d{4}[-\\s]?\\d{4}\\b"
+    ],
+    "license_text": [
+      "Licensed to.*",
+      "This copy is licensed to.*"
+    ],
+    "confidential": [
+      "\\bCONFIDENTIAL\\b",
+      "\\bPROPRIETARY\\b",
+      "\\bINTERNAL USE ONLY\\b"
+    ],
+    "personal_info": [
+      "John Doe",
+      "Jane Smith",
+      "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    ]
+  }
+} 
